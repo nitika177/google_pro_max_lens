@@ -6,7 +6,7 @@ Google Lens Pro Max is an intelligent pipeline that processes an image and a use
 The goal of this project is to offer a seamless integration of image recognition and text-based search, enabling users to get web results based on visual content and contextual queries.
 
 
-![Project Screenshot](WhatsApp Image 2024-10-15 at 10.24.08_f258732f.jpg)
+![Project Screenshot](ai.jpg)
 
 
 Features
