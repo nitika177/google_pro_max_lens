@@ -1,212 +1,138 @@
-!pip install sentence_transformers
+# Install necessary packages
+!pip install --upgrade transformers
+!pip install torch
+!pip install gradio
+!pip install pyngrok
+!pip install pillow
 
-
-from sentence_transformers import SentenceTransformer
-
-model = SentenceTransformer("sentence-transformers/clip-ViT-B-32")
-
-
-from sentence_transformers import SentenceTransformer, util
+# Imports
+from transformers import BlipProcessor, BlipForConditionalGeneration
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+import torch
 from PIL import Image
-
-#Load CLIP model
-model = SentenceTransformer('clip-ViT-B-32')
-
-#Encode an image:
-img_emb = model.encode(Image.open('download.jpg'))
-
-#Encode text descriptions
-text_emb = model.encode(['Two dogs in the snow'])
-
-#Compute cosine similarities
-cos_scores = util.cos_sim(img_emb, text_emb)
-print(cos_scores)
-
-
-!pip install requests beautifulsoup4 pillow sentence-transformers
-
-
-# Example user prompt
-user_prompt = "Show me towels of the same type but in different colors."
-
-
-!pip install sentence-transformers pillow requests flask
-
-
-
-from sentence_transformers import SentenceTransformer
-from PIL import Image
-
-# Load CLIP model
-model = SentenceTransformer('clip-ViT-B-32')
-
-# Load the input image
-input_image_path = '/content/download.jpg'  # Replace with actual image path
-input_image = Image.open(input_image_path)
-
-# Encode the image into an embedding
-image_embedding = model.encode(input_image)
-
-# Print the shape of the embedding
-print("Embedding shape:", image_embedding.shape)
-
-
-
-# Input prompt from the user
-user_prompt = "Show me similar towels"  # Example prompt
-
-# Encode the text prompt into an embedding
-prompt_embedding = model.encode(user_prompt)
 import requests
 from io import BytesIO
+import gradio as gr
+from pyngrok import ngrok
+from transformers import pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-def search_images_on_api(query):
-    # Example with Unsplash API
-    api_key = 'wTyfFBDn0SqcIMqKOhY-v4IzygHAmNgBBlOsPbE9SdU'
-    url = f"https://api.unsplash.com/search/photos?query={query}&client_id={api_key}"
-    response = requests.get(url)
-    return response.json()
+# Check if GPU is available
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Using device: {device}")
 
-# Get image results for the user's prompt
-search_results = search_images_on_api(user_prompt)
-similar_images_urls = [img['urls']['small'] for img in search_results['results']]
-
-# Download and encode similar images
-similar_images_embeddings = []
-for img_url in similar_images_urls:
-    response = requests.get(img_url)
-    img = Image.open(BytesIO(response.content))
-    img_embedding = model.encode(img)
-    similar_images_embeddings.append(img_embedding)
-from sentence_transformers import util
-
-# Compare input image with similar images using cosine similarity
-similarity_scores = util.cos_sim(image_embedding, similar_images_embeddings)
-
-# Output the top N most similar images
-top_n = 7
-top_matches = sorted(zip(similarity_scores[0], similar_images_urls), reverse=True)[:top_n]
-for score, img_url in top_matches:
-    print(f"Similarity score: {score.item()} - Image URL: {img_url}")
-from PIL import Image
-import requests
-
-from transformers import CLIPProcessor, CLIPModel
-
-model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-
-url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-image = Image.open(requests.get(url, stream=True).raw)
-
-inputs = processor(text=["a photo of a cat", "a photo of a dog"], images=image, return_tensors="pt", padding=True)
-
-outputs = model(**inputs)
-logits_per_image = outputs.logits_per_image  # this is the image-text similarity score
-probs = logits_per_image.softmax(dim=1)  # we can take the softmax to get the label probabilities
-!pip install flask-ngrok
-!pip install flask transformers pillow requests
-
-
-!pip install transformers Pillow requests
-import requests
-from PIL import Image
-from transformers import BlipProcessor, BlipForConditionalGeneration
-
+# Load BLIP model and processor
 processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+blip_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base").to(device)
 
-img_url ='shampoo.png'
-raw_image = Image.open(img_url).convert('RGB')
+# Set your token here
+access_token="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"
 
-# conditional image captioning
-text = "a photography of"
-inputs = processor(raw_image, text, return_tensors="pt")
+api_key='BSAkgKhqFS9TeHpQ3HWSFZDS_pumn_7'
+subscription_token="BSAkgKhqFS9TeHpQ3HWSFZDS_pumn_7"
 
-out = model.generate(**inputs)
-print(processor.decode(out[0], skip_special_tokens=True))
-# >>> a photography of a woman and her dog
-
-# unconditional image captioning
-inputs = processor(raw_image, return_tensors="pt")
-
-out = model.generate(**inputs)
-print(processor.decode(out[0], skip_special_tokens=True))
-!pip install anvil-uplink
+model=AutoModelForCausalLM.from_pretrained( "meta-llama/Llama-3.2-1B-Instruct",use_auth_token=access_token)
+tokenizer=AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct",use_auth_token=access_token)
 
 
-import requests
-from PIL import Image
-from transformers import BlipProcessor, BlipForConditionalGeneration
-import anvil.server
-
-# Initialize BLIP processor and model
-processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
-
-# Define a function to process the image and perform the search
-@anvil.server.callable
-def process_image_and_search(img_url, user_prompt):
-    # Load image from the URL
-    raw_image = Image.open(requests.get(img_url, stream=True).raw).convert('RGB')
-
-    # Generate image caption using BLIP
-    inputs = processor(raw_image, return_tensors="pt")
-    out = model.generate(**inputs)
-    caption = processor.decode(out[0], skip_special_tokens=True)
-
-    # Merge the caption with the user-defined prompt
-    combined_text = f"{user_prompt}: {caption}"
-
-    # Perform SerpAPI search
-    api_key = "your_serpapi_key"  # Replace with your SerpAPI key
-    search_url = f"https://serpapi.com/search.json?q={combined_text}&api_key={api_key}"
-    response = requests.get(search_url).json()
-
-    # Collect and return search results
-    search_results = []
-    for result in response.get('organic_results', []):
-        search_results.append({'title': result['title'], 'link': result['link']})
-
-    return search_results
-import requests
-
-# SerpAPI setup
-api_key = "4a3e1f0609cb7e3cf138e436f4d2b162a6d0d6e1e3efc68cd199e2807ee395a5"
+model_id = "meta-llama/Llama-3.2-1B-Instruct"
 
 
-def serp_search(combined_text, api_key):
-    url = f"https://serpapi.com/search.json?q={combined_text}&api_key={api_key}"
-    response = requests.get(url)
-    return response.json()
-
-# Define combined_text with your desired search query
-combined_text = ""  # Replace with your actual query
-
-results = serp_search(combined_text, api_key)
-
-# Display search results
-for result in results['organic_results']:
-    print(f"Title: {result['title']}")
-    print(f"Link: {result['link']}")
-import requests
-
-# SerpAPI setup
-api_key = "4a3e1f0609cb7e3cf138e436f4d2b162a6d0d6e1e3efc68cd199e2807ee395a5"
+pipe = pipeline("text-generation", model=model_id, torch_dtype=torch.bfloat16,device_map="auto",)
 
 
-def serp_search(combined_text, api_key):
-    url = f"https://serpapi.com/search.json?q={combined_text}&api_key={api_key}"
-    response = requests.get(url)
-    return response.json()
 
-# Define combined_text with your desired search query
-combined_text = ""  # Replace with your actual query
 
-results = serp_search(combined_text, api_key)
 
-# Display search results
-for result in results['organic_results']:
-    print(f"Title: {result['title']}")
-    print(f"Link: {result['link']}")
-anvil.server.wait_forever()
+
+# Function to process image and user prompt
+def process_input(image, user_prompt):
+    try:
+        if image is not None:
+            image = image.convert("RGB")
+        else:
+            return "No image provided.", "", ""
+
+        # Preprocess image
+        inputs = processor(image, return_tensors="pt").to(device)
+
+        # Generate image caption
+        with torch.no_grad():
+            caption_ids = blip_model.generate(**inputs)
+            image_context = processor.decode(caption_ids[0], skip_special_tokens=True)
+
+        # Build prompt
+        messages = [
+            {
+                "role": "system",
+                "content": """You are an intelligent assistant refining search queries by combining image descriptions and user queries.
+Always prioritize the user's query, using the image context only when relevant.
+Your output must be a clean, concise, and to-the-point search query with no additional explanations, phrases, or unnecessary words."""
+            },
+            {
+                "role": "user",
+                "content": f"Image description: {image_context} \nUser's question: {user_prompt}"
+            }
+        ]
+
+        outputs = pipe(messages, max_new_tokens=64)
+        refined_question = outputs[0]["generated_text"][-1]['content']
+
+        # Web search using Brave API
+        params = {'q': refined_question, 'count': 10, 'offset': 0}
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'x-subscription-token': subscription_token
+        }
+        response = requests.get("https://api.search.brave.com/res/v1/web/search", headers=headers, params=params)
+        if response.status_code != 200:
+          return image_context, refined_question, f"Error: Brave API returned status code {response.status_code} — {response.text}"
+
+        search_results = response.json()
+
+        web_results = search_results.get("web", {}).get("results", [])
+        output = ""
+        if web_results:
+            for result in web_results:
+                title = result.get("title", "No title available")
+                url = result.get("url", "No URL available")
+                output += f'<a href="{url}" target="_blank">{title}</a><br><br>'
+        else:
+            output = "No results found."
+
+        return image_context, refined_question, output
+
+    except Exception as e:
+        return "Error during processing", "", f"Exception: {str(e)}"
+
+
+
+# Create Gradio interface
+iface = gr.Interface(
+    fn=process_input,
+    inputs=[
+        gr.Image(type="pil", label="Drop Image or Upload"),
+        gr.Textbox(lines=1, placeholder="Enter your question here...", label="User Question")
+    ],
+    outputs=[
+        gr.Textbox(label="Image Context"),
+        gr.Textbox(label="Final Search Query"),
+        gr.HTML(label="Search Results")
+    ],
+    title="Google Lens Pro Max",
+    description="""
+    <h4 style='font-size: 18px; text-align: center;'>Image and Question-based Search Assistant</h4>
+    <p>Upload an image, enter your question, and get relevant search results along with image results.</p>
+    """
+)
+
+# Ngrok setup
+ngrok.kill()
+!ngrok config add-authtoken 2nKvobAogGY1eWBnw3DBIOKBIKn_6HSLYUkA2iSfreYyTN3XY
+
+# Start a new tunnel
+public_url = ngrok.connect(7860)
+print(f"Public URL: {public_url}")
+
+# Launch the Gradio interface
+iface.launch()
